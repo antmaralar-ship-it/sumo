@@ -14,7 +14,7 @@
 /// @file    GUIProntuarioWindow.h
 /// @date    November 2026
 ///
-// Window with the prontuario indicators of one street
+// Window with the prontuario indicators (or the edgeData variables) of one street
 /****************************************************************************/
 #pragma once
 #include <config.h>
@@ -43,11 +43,12 @@ public:
     enum {
         MID_PRONTUARIO_REFRESH = FXMainWindow::ID_LAST,
         MID_PRONTUARIO_COPY,
+        MID_PRONTUARIO_EXPORT,
         MID_PRONTUARIO_CLOSE
     };
 
-    /// @brief Constructor (the window shows itself)
-    GUIProntuarioWindow(GUIMainWindow& app, const std::string& edgeID);
+    /// @brief Constructor (the window shows itself); variables selects the edgeData table
+    GUIProntuarioWindow(GUIMainWindow& app, const std::string& edgeID, bool variables);
 
     /// @brief Destructor
     ~GUIProntuarioWindow();
@@ -58,8 +59,17 @@ public:
     /// @brief copy the report to the clipboard
     long onCmdCopy(FXObject*, FXSelector, void*);
 
+    /// @brief export to Excel
+    long onCmdExport(FXObject*, FXSelector, void*);
+
     /// @brief close the window
     long onCmdClose(FXObject*, FXSelector, void*);
+
+    /// @brief asks for a file name and writes the Excel workbook of the edge
+    static void exportExcel(FXWindow* parent, GUIMainWindow* app, const std::string& edgeID, bool indicators, bool variables);
+
+    /// @brief runs tools/prontuario/ajustar_aforos.py and reloads the simulation
+    static void adjustDemand(FXWindow* parent, GUIMainWindow* app);
 
 protected:
     /// @brief FOX needs this
@@ -70,6 +80,7 @@ private:
 
     GUIMainWindow* myApp = nullptr;
     std::string myEdgeID;
+    bool myVariables = false;
     FXText* myText = nullptr;
     std::string myReport;
 };

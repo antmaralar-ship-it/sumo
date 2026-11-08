@@ -1026,7 +1026,22 @@ GUILane::getPopUpMenu(GUIMainWindow& app, GUISUMOAbstractView& parent) {
     //
     buildShowParamsPopupEntry(ret, false);
     if (MSProntuario::active() && myEdge->isNormal()) {
+        new FXMenuSeparator(ret);
         GUIDesigns::buildFXMenuCommand(ret, "Indicadores del prontuario", GUIIconSubSys::getIcon(GUIIcon::APP_TABLE), &parent, MID_PRONTUARIO);
+        GUIDesigns::buildFXMenuCommand(ret, "Exportar indicadores del prontuario a Excel...", GUIIconSubSys::getIcon(GUIIcon::SAVE), &parent, MID_PRONTUARIO_EXCEL);
+        GUIDesigns::buildFXMenuCommand(ret, "Tabla de variables de la calle (edgeData)", GUIIconSubSys::getIcon(GUIIcon::APP_TABLE), &parent, MID_PRONTUARIO_VARIABLES);
+        const double fc = MSProntuario::fieldCount(myEdge);
+        GUIDesigns::buildFXMenuCommand(ret, fc >= 0 ? "Cambiar aforo de campo (" + toString((int)std::round(fc)) + " veh/h)..." : std::string("Introducir aforo de campo (veh/h)..."),
+                                       nullptr, &parent, MID_PRONTUARIO_AFORO);
+        if (MSProntuario::numFieldCounts() > 0) {
+            GUIDesigns::buildFXMenuCommand(ret, "Ajustar la demanda a los aforos de campo (" + toString(MSProntuario::numFieldCounts()) + " calles)", nullptr, &parent, MID_PRONTUARIO_AJUSTAR);
+        }
+        char vmax[64];
+        snprintf(vmax, sizeof(vmax), "%.2f", myEdge->getSpeedLimit() * 3.6);
+        std::string vtxt(vmax);
+        std::replace(vtxt.begin(), vtxt.end(), '.', ',');
+        GUIDesigns::buildFXMenuCommand(ret, "Cambiar la velocidad m\303\241xima de la calle (" + vtxt + " km/h)...", nullptr, &parent, MID_PRONTUARIO_VMAX);
+        new FXMenuSeparator(ret);
     }
     const PositionVector& baseShape = getShape(parent.getVisualisationSettings().secondaryShape);
     const double pos = interpolateGeometryPosToLanePos(baseShape.nearest_offset_to_point25D(parent.getPositionInformation()));
@@ -1363,7 +1378,7 @@ GUILane::getColorValue(const GUIVisualizationSettings& s, int activeScheme) cons
         case 2:
             return (double)myPermissions;
         case 3:
-            return getSpeedLimit();
+            return getSpeedLimit() * 3.6; // km/h
         case 4:
             return getBruttoOccupancy();
         case 5:
@@ -1419,7 +1434,7 @@ GUILane::getColorValue(const GUIVisualizationSettings& s, int activeScheme) cons
         }
         case 25: {
             // color by average speed
-            return getMeanSpeed();
+            return getMeanSpeed() * 3.6; // km/h
         }
         case 26: {
             // color by average relative speed
@@ -1427,7 +1442,7 @@ GUILane::getColorValue(const GUIVisualizationSettings& s, int activeScheme) cons
         }
         case 27: {
             // color by routing device assumed speed
-            return myEdge->getRoutingSpeed();
+            return myEdge->getRoutingSpeed() * 3.6; // km/h
         }
         case 28:
             return getEmissions<PollutantsInterface::ELEC>() / myLength;

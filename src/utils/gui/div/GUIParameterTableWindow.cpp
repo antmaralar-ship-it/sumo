@@ -213,8 +213,12 @@ GUIParameterTableWindow::mkItem(const char* name, bool dynamic, std::string valu
 
 void
 GUIParameterTableWindow::mkItem(const char* name, bool dynamic, double value) {
+    std::string n(name);
+    if (speedNameToKmh(n)) {
+        value *= 3.6;
+    }
     myTable->insertRows((int)myItems.size() + 1);
-    GUIParameterTableItemInterface* i = new GUIParameterTableItem<double>(myTable, myCurrentPos++, name, dynamic, value);
+    GUIParameterTableItemInterface* i = new GUIParameterTableItem<double>(myTable, myCurrentPos++, n, dynamic, value);
     myItems.push_back(i);
 }
 

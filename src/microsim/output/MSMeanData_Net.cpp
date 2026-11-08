@@ -412,6 +412,16 @@ MSMeanData_Net::MSLaneMeanDataValues::getAttributeValue(SumoXMLAttr a,
         }
         case SUMO_ATTR_DISTANCE:
             return frontTravelledDistance;
+        case SUMO_ATTR_SAMPLEDSECONDS:
+            return sampleSeconds;
+        case SUMO_ATTR_TRAVELTIME:
+            return frontTravelledDistance > NUMERICAL_EPS ? myLaneLength * frontSampleSeconds / frontTravelledDistance : 0.;
+        case SUMO_ATTR_OVERLAPTRAVELTIME:
+            return travelledDistance > 0. && sampleSeconds > 0. ? (myLaneLength + vehLengthSum / sampleSeconds) * sampleSeconds / travelledDistance : 0.;
+        case SUMO_ATTR_LANECHANGEDFROM:
+            return nVehLaneChangeFrom;
+        case SUMO_ATTR_LANECHANGEDTO:
+            return nVehLaneChangeTo;
         default:
             return 0;
     }

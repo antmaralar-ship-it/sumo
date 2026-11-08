@@ -357,7 +357,7 @@ double
 GUIContainer::getColorValue(const GUIVisualizationSettings& /* s */, int activeScheme) const {
     switch (activeScheme) {
         case 4:
-            return getSpeed();
+            return getSpeed() * 3.6; // km/h
         case 5:
             if (isWaiting4Vehicle()) {
                 return 5;

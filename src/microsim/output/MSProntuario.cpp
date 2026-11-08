@@ -19,6 +19,8 @@
 #include <config.h>
 
 #include <algorithm>
+#include <fstream>
+#include <regex>
 #include <cmath>
 #include <cstdio>
 #include <set>
@@ -30,6 +32,9 @@
 #include <utils/geom/PositionVector.h>
 #include <utils/geom/GeomHelper.h>
 #include <utils/iodevices/OutputDevice.h>
+#include <utils/iodevices/XLSXWriter.h>
+#include <utils/common/FileHelpers.h>
+#include <utils/xml/XMLSubSys.h>
 #include <utils/options/OptionsCont.h>
 #include <microsim/MSNet.h>
 #include <microsim/MSEdge.h>
@@ -60,6 +65,7 @@ MSMeanData* MSProntuario::myEmissions = nullptr;
 MSMeanData* MSProntuario::myNoise = nullptr;
 SUMOTime MSProntuario::myBegin = 0;
 std::map<const MSEdge*, double> MSProntuario::myCongestionCache;
+std::map<std::string, std::pair<double, double> > MSProntuario::myFieldCounts;
 SUMOTime MSProntuario::myCongestionCacheTime = -1;
 std::map<std::string, std::vector<const MSEdge*> > MSProntuario::myCrossings;
 
@@ -204,9 +210,30 @@ void wrap(std::vector<std::string>& out, const std::string& text, const std::str
     }
 }
 
+/// @brief collector for table output
+std::vector<MSProntuario::Row>* gRows = nullptr;
+std::string gSection;
+
 /// @brief one graded indicator
 void row(std::vector<std::string>* out, const std::string& name, const std::string& val, Grade g,
          const std::string& umbral = "", const std::string& note = "", const std::string& src = "") {
+    if (gRows != nullptr) {
+        MSProntuario::Row r;
+        r.section = gSection;
+        std::string n = name;
+        while (!n.empty() && n[0] == ' ') {
+            n = n.substr(1);
+        }
+        r.name = n;
+        r.value = val.empty() ? "-" : val;
+        std::string gt = gradeText(g);
+        r.grade = gt.substr(1, gt.size() - 2);
+        r.gradeCode = (int)g;
+        r.umbral = umbral;
+        r.note = note;
+        r.source = src;
+        gRows->push_back(r);
+    }
     if (out == nullptr) {
         return;
     }
@@ -238,6 +265,7 @@ void row(std::vector<std::string>* out, const std::string& name, const std::stri
 }
 
 void section(std::vector<std::string>* out, const std::string& title) {
+    gSection = title;
     if (out != nullptr) {
         out->push_back("");
         out->push_back(title);
@@ -392,6 +420,7 @@ MSProntuario::install(const OptionsCont& oc, bool gui) {
         dc.addInMemory(md);
     }
     buildCrossingMap();
+    loadFieldCounts();
 }
 
 
@@ -612,6 +641,28 @@ MSProntuario::compute(const MSEdge* e, Key& k, std::vector<std::string>* out) {
         } else {
             row(out, "Dieta viaria (4 -> 3 carriles) *", "no aplica", NA, "", "Solo para calles de 2 + 2 carriles; esta tiene " + toString(nCar) + (op != nullptr ? " + " + toString(opCar) : "") + ".");
         }
+    }
+
+    // ---------------- field count and through traffic ----------------
+    if (nCar > 0) {
+        section(out, "AFORO DE CAMPO Y TR\303\201FICO DE PASO");
+        const double fc = fieldCount(e);
+        if (fc >= 0) {
+            const double M = has(motorH) ? motorH : 0;
+            const double geh = (M + fc) > 0 ? std::sqrt(2 * (M - fc) * (M - fc) / (M + fc)) : 0;
+            k.geh = geh;
+            row(out, "Aforo de campo", num(fc) + " veh/h", DATO,
+                "simulado: " + num(M) + " veh/h" + (fc > 0 ? " (" + std::string(M >= fc ? "+" : "") + num((M - fc) / fc * 100) + " %)" : ""));
+            row(out, "Ajuste al aforo (GEH) *", num(geh, 1), geh < 5 ? OPT : geh <= 10 ? ADEC : INSUF,
+                "GEH = ra\303\255z(2 (M - C)\302\262 / (M + C)), M simulado y C aforo en veh/h. \303\223ptimo < 5 (el modelo reproduce la calle); Adecuado 5-10 (revisar); Insuficiente > 10",
+                "Para acercar la simulaci\303\263n a los aforos: bot\303\263n derecho > \302\253Ajustar la demanda a los aforos de campo\302\273.", "DMRB, criterio de calibraci\303\263n");
+        } else {
+            row(out, "Aforo de campo", "no introducido", NA, "", "Bot\303\263n derecho sobre la calle > \302\253Introducir aforo de campo (veh/h)\302\273.");
+        }
+        double ff = -1;
+        const std::string fringe = fringeInfo(e, ff);
+        row(out, "Calle de borde (tr\303\241fico de paso)", fringe, DATO, ff > 0 ? "factor de tr\303\241fico de paso con que se gener\303\263 el escenario: " + num(ff, 1) : "",
+            "El factor de osmWebWizard multiplica la probabilidad de que los viajes empiecen o acaben en las calles del borde de la zona. Solo act\303\272a al generar los viajes; para ajustar el tr\303\241fico de una calle usa su aforo de campo.");
     }
 
     // ---------------- design ----------------
@@ -968,6 +1019,340 @@ MSProntuario::writeOutput() {
         }
     }
     dev.close();
+}
+
+
+// ===========================================================================
+// tables, Excel, field counts
+// ===========================================================================
+std::vector<MSProntuario::Row>
+MSProntuario::rows(const MSEdge* edge, std::vector<std::string>& header) {
+    std::vector<Row> result;
+    header.clear();
+    if (!active() || edge == nullptr || !edge->isNormal()) {
+        return result;
+    }
+    Key k;
+    std::vector<std::string> lines;
+    gRows = &result;
+    gSection.clear();
+    compute(edge, k, &lines);
+    gRows = nullptr;
+    // title lines up to the first empty line after the header
+    for (int i = 0; i < (int)lines.size() && i < 7; i++) {
+        if (!lines[i].empty()) {
+            header.push_back(lines[i]);
+        }
+    }
+    return result;
+}
+
+
+std::vector<MSProntuario::Variable>
+MSProntuario::variables(const MSEdge* edge) {
+    std::vector<Variable> result;
+    if (!active() || edge == nullptr || !edge->isNormal()) {
+        return result;
+    }
+    const MSMeanData* md = myCars;
+    auto v = [&](SumoXMLAttr a) {
+        return value(md, edge, a);
+    };
+    auto add = [&](const std::string & attr, const std::string & es, const std::string & mide, const std::string & unidad,
+    const std::string & sirve, const std::string & cifras, double val, int dec, const std::string & text = "") {
+        Variable var;
+        var.attr = attr;
+        var.nameES = es;
+        var.measures = mide;
+        var.unit = unidad;
+        var.purpose = sirve;
+        var.reference = cifras;
+        var.hasValue = has(val);
+        var.value = var.hasValue ? val : 0;
+        var.valueText = !text.empty() ? text : (var.hasValue ? num(val, dec) : "-");
+        result.push_back(var);
+    };
+    const double hours = elapsed() / 3600.;
+    const double entered = v(SUMO_ATTR_ENTERED), departed = v(SUMO_ATTR_DEPARTED);
+    const double speed = v(SUMO_ATTR_SPEED);
+    add("entered", "veh\303\255culos entrados", "Coches que entraron en la calle desde otra calle", "veh\303\255culos", "Aforo",
+        "Calle residencial: 10-150. Calle de barrio con paso: 150-500. Avenida: 500-1.500 por sentido. En el ejemplo, la m\303\241s cargada tiene 185", entered, 0);
+    add("departed", "veh\303\255culos que inician viaje", "Coches que empezaron su viaje en esa calle (salen de un garaje o aparcamiento)", "veh\303\255culos", "Aforo y calles que generan viajes",
+        "Casi siempre 0-5 por calle; m\303\241s de 10 indica una zona con muchos or\303\255genes (viviendas, aparcamientos)", departed, 0);
+    add("arrived", "veh\303\255culos que terminan viaje", "Coches que terminaron su viaje en esa calle", "veh\303\255culos", "Calles que atraen viajes (destinos)",
+        "Casi siempre 0-5 por calle; m\303\241s de 10 indica un destino importante (centro comercial, instituto, estaci\303\263n)", v(SUMO_ATTR_ARRIVED), 0);
+    add("left", "veh\303\255culos salidos", "Coches que salieron de la calle hacia otra", "veh\303\255culos", "Comprobar el aforo",
+        "Debe ser aprox. entered + departed - arrived. Si es bastante menor, quedan coches atrapados en la calle al acabar", v(SUMO_ATTR_LEFT), 0);
+    add("flow", "intensidad (flujo)", "Intensidad calculada como densidad x velocidad (no es un recuento)", "veh\303\255culos/hora", "Aforo aproximado con tr\303\241fico fluido",
+        "Un carril urbano con sem\303\241foro admite unos 600-900 veh/h; sin sem\303\241foro, hasta unos 1.800. Si flow es mucho menor que entered + departed (por hora), hay atasco (ejemplo: 69 frente a 110)", v(SUMO_ATTR_FLOW), 2,
+        has(v(SUMO_ATTR_FLOW)) ? num(v(SUMO_ATTR_FLOW), 2) + "  (entered + departed por hora: " + num(hours > 0 && has(entered) ? (entered + (has(departed) ? departed : 0)) / hours : NO_DATA, 2) + ")" : "");
+    add("speed", "velocidad media", "Velocidad media de los coches en la calle", "km/h", "Atasco",
+        "Calle a 50 km/h fluida: 30-47 km/h. Calle a 30 km/h fluida: 18-29 km/h. Menos de 7 km/h: atasco. Ejemplo: 34,60 fluida, 1,37 atascada", has(speed) ? speed * 3.6 : NO_DATA, 2);
+    add("speedRelative", "velocidad relativa", "Velocidad media dividida entre el l\303\255mite de la calle (1 = van al l\303\255mite)", "proporci\303\263n de 0 a 1", "Atasco: el indicador m\303\241s claro",
+        "M\303\241s de 0,7: fluido. 0,4-0,7: denso. Menos de 0,4: atasco. Puede pasar de 1 porque algunos conductores superan algo el l\303\255mite", v(SUMO_ATTR_SPEEDREL), 2);
+    add("occupancy", "ocupaci\303\263n", "Porcentaje de la calle ocupado por coches", "%", "Atasco",
+        "Menos de 10 %: fluido. 10-25 %: denso. M\303\241s de 25 %: atasco. Ejemplo: 1,3 % fluida, 42,5 % atascada", v(SUMO_ATTR_OCCUPANCY), 2);
+    add("density", "densidad", "Coches que hay de media por kil\303\263metro de calle", "veh/km", "Atasco",
+        "Menos de 20 por carril: fluido. 20-50: denso. M\303\241s de 50: atasco. 133 veh/km es el m\303\241ximo f\303\255sico: coches parados en fila, uno cada 7,5 m (5 m de coche + 2,5 m de hueco)", v(SUMO_ATTR_DENSITY), 2);
+    add("laneDensity", "densidad por carril", "Igual que density, pero por carril", "veh/km y carril", "Atasco en calles de varios carriles",
+        "Mismas cifras que density. En calles de un carril, density y laneDensity coinciden", v(SUMO_ATTR_LANEDENSITY), 2);
+    const double nVeh = has(entered) ? entered + (has(departed) ? departed : 0) : 0;
+    const double wt = v(SUMO_ATTR_WAITINGTIME), tl = v(SUMO_ATTR_TIMELOSS);
+    add("waitingTime", "tiempo de espera (parado)", "Suma de los segundos que han estado parados todos los coches", "s (total)", "Atasco y colas en sem\303\241foros",
+        "Div\303\255delo entre los coches. Por coche: 0-5 s fluido; 10-30 s normal con sem\303\241foro; m\303\241s de 30-45 s atasco", wt, 2,
+        has(wt) ? num(wt, 2) + "  (por coche: " + (nVeh > 0 ? num(wt / nVeh, 2) : std::string("-")) + " s)" : "");
+    add("timeLoss", "tiempo perdido (demora)", "Suma de los segundos perdidos por no ir a la velocidad deseada (frenazos, colas)", "s (total)", "Coste del atasco",
+        "Div\303\255delo entre los coches. Por coche y calle: menos de 5 s fluido; 10-30 s con sem\303\241foro; m\303\241s de 30 s atasco", tl, 2,
+        has(tl) ? num(tl, 2) + "  (por coche: " + (nVeh > 0 ? num(tl / nVeh, 2) : std::string("-")) + " s)" : "");
+    const double tt = v(SUMO_ATTR_TRAVELTIME);
+    double vfree = 0;
+    for (const MSLane* l : edge->getLanes()) {
+        if (isCarLane(l)) {
+            vfree = MAX2(vfree, l->getSpeedLimit());
+        }
+    }
+    add("traveltime", "tiempo de recorrido", "Tiempo medio que tarda un coche en recorrer la calle", "s", "Comparar escenarios",
+        "Comp\303\241ralo con el tiempo sin tr\303\241fico: longitud / l\303\255mite (100 m a 50 km/h = 7 s). Hasta 2 veces ese valor: normal. M\303\241s de 3 veces: atasco", tt, 2,
+        has(tt) && tt > 0 ? num(tt, 2) + "  (sin tr\303\241fico: " + (vfree > 0 ? num(edge->getLength() / vfree, 2) : std::string("-")) + " s)" : "");
+    const double ss = v(SUMO_ATTR_SAMPLEDSECONDS);
+    add("sampledSeconds", "segundos-veh\303\255culo", "Suma de los segundos que han pasado todos los coches en la calle", "veh x s", "Horas de veh\303\255culo en la calle (/ 3600)",
+        "/ 3600 = coches que hay a la vez en la calle de media. Comp\303\241ralo con lo que cabe en la calle en cola (longitud / 7,5 m): si se acerca, la calle est\303\241 llena", ss, 2,
+        has(ss) ? num(ss, 2) + "  (coches a la vez: " + num(elapsed() > 0 ? ss / elapsed() : NO_DATA, 2) + "; caben " + num(edge->getLength() / 7.5, 1) + ")" : "");
+    add("distance", "distancia recorrida", "Metros recorridos por todos los coches en la calle", "metros", "Kil\303\263metros totales recorridos (/ 1000)",
+        "Aprox. coches x longitud de la calle. Sumado en toda la zona del ejemplo: 372 km en 1 hora", v(SUMO_ATTR_DISTANCE), 2);
+    const double lcf = v(SUMO_ATTR_LANECHANGEDFROM), lct = v(SUMO_ATTR_LANECHANGEDTO);
+    add("laneChangedFrom / To", "cambios de carril (desde / hacia)", "Cambios de carril hechos desde / hacia la calle", "n.\302\272 de maniobras", "Calles con muchas maniobras de incorporaci\303\263n",
+        "0 en calles de un carril. Decenas en avenidas de varios carriles. Muchos cientos: zona de incorporaci\303\263n conflictiva", lcf, 0, num(lcf, 0) + " / " + num(lct, 0));
+    const double ott = v(SUMO_ATTR_OVERLAPTRAVELTIME), od = v(SUMO_ATTR_OVERLAPDENSITY);
+    add("overlapTraveltime / overlapDensity", "tiempo de recorrido y densidad con solape", "Como traveltime y density, pero contando tambi\303\251n el trozo del coche que asoma en la calle siguiente", "s, veh/km",
+        "Uso avanzado; se pueden ignorar", "Algo mayores que traveltime y density (ejemplo: 20,85 frente a 20,01 s)", ott, 2, num(ott, 2) + " / " + num(od, 2));
+    return result;
+}
+
+
+std::string
+MSProntuario::variablesReport(const MSEdge* edge) {
+    if (!active() || edge == nullptr || !edge->isNormal()) {
+        return "Elige una calle normal con la simulaci\303\263n cargada.";
+    }
+    std::vector<std::string> out;
+    out.push_back("QU\303\211 SIGNIFICA CADA VARIABLE (datos edgeData de los coches)");
+    out.push_back("");
+    out.push_back("Calle: " + (edge->getStreetName().empty() ? std::string("(sin nombre)") : edge->getStreetName()) + "    tramo " + edge->getID());
+    out.push_back("Datos: coches, toda la simulaci\303\263n hasta ahora (" + num(elapsed() / 60.) + " min). Velocidades en km/h.");
+    for (const Variable& var : variables(edge)) {
+        out.push_back("");
+        out.push_back("  " + var.attr + " = " + var.nameES + ":  " + var.valueText + "  [" + var.unit + "]");
+        wrap(out, "Qu\303\251 mide: " + var.measures + ". Para qu\303\251 sirve: " + var.purpose + ".", "      ");
+        wrap(out, "Cifras orientativas (calle urbana, 1 hora): " + var.reference, "      ");
+    }
+    out.push_back("");
+    wrap(out, "Las cifras orientativas sirven para tener un orden de magnitud en calles urbanas. No son normas oficiales y cambian seg\303\272n el tipo de calle, los sem\303\241foros y la hora.", "");
+    std::string r;
+    for (const std::string& l : out) {
+        r += l + "\n";
+    }
+    return r;
+}
+
+
+bool
+MSProntuario::exportExcel(const MSEdge* edge, const std::string& file, bool indicators, bool vars, std::string& error) {
+    if (!active() || edge == nullptr || !edge->isNormal()) {
+        error = "No hay datos de esta calle.";
+        return false;
+    }
+    XLSXWriter w;
+    const std::string calle = edge->getStreetName().empty() ? std::string("(sin nombre)") : edge->getStreetName();
+    if (indicators) {
+        std::vector<std::string> header;
+        const std::vector<Row> rs = rows(edge, header);
+        std::vector<XLSXWriter::Row> sheet;
+        sheet.push_back({XLSXWriter::Cell("Indicadores del Prontuario de urbanismo y movilidad", XLSXWriter::TITLE)});
+        for (int i = 1; i < (int)header.size(); i++) {
+            sheet.push_back({XLSXWriter::Cell(header[i])});
+        }
+        sheet.push_back({});
+        sheet.push_back({XLSXWriter::Cell("Bloque", XLSXWriter::HEADER), XLSXWriter::Cell("Indicador", XLSXWriter::HEADER),
+                         XLSXWriter::Cell("Valor", XLSXWriter::HEADER), XLSXWriter::Cell("Valoraci\303\263n", XLSXWriter::HEADER),
+                         XLSXWriter::Cell("Umbrales", XLSXWriter::HEADER), XLSXWriter::Cell("Observaciones", XLSXWriter::HEADER),
+                         XLSXWriter::Cell("Fuente", XLSXWriter::HEADER)});
+        for (const Row& r : rs) {
+            XLSXWriter::Style gs = r.gradeCode == 0 ? XLSXWriter::GOOD : r.gradeCode == 1 ? XLSXWriter::FAIR : r.gradeCode == 2 ? XLSXWriter::BAD : XLSXWriter::WRAP;
+            sheet.push_back({XLSXWriter::Cell(r.section, XLSXWriter::WRAP), XLSXWriter::Cell(r.name, XLSXWriter::WRAP), XLSXWriter::Cell(r.value, XLSXWriter::WRAP),
+                             XLSXWriter::Cell(r.grade, gs), XLSXWriter::Cell(r.umbral, XLSXWriter::WRAP), XLSXWriter::Cell(r.note, XLSXWriter::WRAP),
+                             XLSXWriter::Cell(r.source, XLSXWriter::WRAP)});
+        }
+        w.addSheet("Indicadores", sheet, {24, 34, 20, 14, 60, 60, 18});
+    }
+    if (vars) {
+        std::vector<XLSXWriter::Row> sheet;
+        sheet.push_back({XLSXWriter::Cell("Qu\303\251 significa cada variable: " + calle + " (tramo " + edge->getID() + ")", XLSXWriter::TITLE)});
+        sheet.push_back({XLSXWriter::Cell("Datos edgeData de los coches, toda la simulaci\303\263n (" + num(elapsed() / 60.) + " min). Velocidades en km/h.")});
+        sheet.push_back({});
+        sheet.push_back({XLSXWriter::Cell("Variable", XLSXWriter::HEADER), XLSXWriter::Cell("Variable (castellano)", XLSXWriter::HEADER),
+                         XLSXWriter::Cell("Qu\303\251 mide", XLSXWriter::HEADER), XLSXWriter::Cell("Unidad", XLSXWriter::HEADER),
+                         XLSXWriter::Cell("Para qu\303\251 sirve", XLSXWriter::HEADER),
+                         XLSXWriter::Cell("Cifras orientativas (calle urbana, intervalo de 1 hora)", XLSXWriter::HEADER),
+                         XLSXWriter::Cell("Valor en la simulaci\303\263n", XLSXWriter::HEADER), XLSXWriter::Cell("Detalle", XLSXWriter::HEADER)});
+        for (const Variable& var : variables(edge)) {
+            XLSXWriter::Row r = {XLSXWriter::Cell(var.attr, XLSXWriter::WRAP), XLSXWriter::Cell(var.nameES, XLSXWriter::WRAP),
+                                 XLSXWriter::Cell(var.measures, XLSXWriter::WRAP), XLSXWriter::Cell(var.unit, XLSXWriter::WRAP),
+                                 XLSXWriter::Cell(var.purpose, XLSXWriter::WRAP), XLSXWriter::Cell(var.reference, XLSXWriter::WRAP)
+                                };
+            if (var.hasValue) {
+                r.push_back(XLSXWriter::Cell(var.value));
+            } else {
+                r.push_back(XLSXWriter::Cell("-", XLSXWriter::WRAP));
+            }
+            r.push_back(XLSXWriter::Cell(var.valueText, XLSXWriter::WRAP));
+            sheet.push_back(r);
+        }
+        sheet.push_back({});
+        sheet.push_back({XLSXWriter::Cell("Las cifras orientativas sirven para tener un orden de magnitud en calles urbanas. No son normas oficiales y cambian seg\303\272n el tipo de calle, los sem\303\241foros y la hora.")});
+        w.addSheet("Variables", sheet, {22, 26, 40, 14, 28, 60, 16, 34});
+    }
+    return w.save(file, error);
+}
+
+
+std::string
+MSProntuario::scenarioDir() {
+    const OptionsCont& oc = OptionsCont::getOptions();
+    std::string f;
+    if (oc.isSet("configuration-file")) {
+        f = oc.getString("configuration-file");
+    } else if (oc.isSet("net-file")) {
+        f = oc.getString("net-file");
+    }
+    return f.empty() ? "" : FileHelpers::getFilePath(f);
+}
+
+
+std::string
+MSProntuario::fieldCountFile() {
+    return scenarioDir() + "aforos_campo.xml";
+}
+
+
+void
+MSProntuario::loadFieldCounts() {
+    myFieldCounts.clear();
+    std::ifstream in(XMLSubSys::transcodeToLocal(fieldCountFile()).c_str());
+    if (!in.good()) {
+        return;
+    }
+    const std::regex re("<edge\\s+id=\"([^\"]+)\"[^>]*\\baforo=\"([0-9.]+)\"(?:[^>]*\\bbuses=\"([0-9.]+)\")?");
+    std::string line;
+    while (std::getline(in, line)) {
+        std::smatch m;
+        if (std::regex_search(line, m, re)) {
+            myFieldCounts[m[1].str()] = std::make_pair(StringUtils::toDouble(m[2].str()), m[3].matched ? StringUtils::toDouble(m[3].str()) : 0.);
+        }
+    }
+}
+
+
+bool
+MSProntuario::writeFieldCounts(std::string& error) {
+    const OptionsCont& oc = OptionsCont::getOptions();
+    const double begin = STEPS2TIME(string2time(oc.getString("begin")));
+    double end = oc.isSet("end") ? STEPS2TIME(string2time(oc.getString("end"))) : -1;
+    if (end <= begin) {
+        end = begin + 3600;
+    }
+    const double hours = (end - begin) / 3600.;
+    std::ofstream out(XMLSubSys::transcodeToLocal(fieldCountFile()).c_str());
+    if (!out.good()) {
+        error = "No se puede escribir '" + fieldCountFile() + "'.";
+        return false;
+    }
+    out << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        << "<!-- Aforos de campo introducidos en sumo-gui (veh/h de veh\303\255culos a motor).\n"
+        << "     aforo: veh/h contados; buses: autobuses/h simulados en la calle al introducir el aforo;\n"
+        << "     entered: coches que debe reproducir routeSampler en el intervalo = (aforo - buses) x horas. -->\n"
+        << "<data>\n"
+        << "    <interval id=\"aforos_campo\" begin=\"" << begin << "\" end=\"" << end << "\">\n";
+    for (const auto& item : myFieldCounts) {
+        const double cars = MAX2(0., item.second.first - item.second.second) * hours;
+        out << "        <edge id=\"" << item.first << "\" aforo=\"" << item.second.first << "\" buses=\"" << item.second.second
+            << "\" entered=\"" << (int)std::round(cars) << "\"/>\n";
+    }
+    out << "    </interval>\n</data>\n";
+    out.close();
+    return true;
+}
+
+
+double
+MSProntuario::fieldCount(const MSEdge* edge) {
+    auto it = myFieldCounts.find(edge->getID());
+    return it == myFieldCounts.end() ? -1 : it->second.first;
+}
+
+
+bool
+MSProntuario::setFieldCount(const MSEdge* edge, double vehPerHour, std::string& error) {
+    if (vehPerHour < 0) {
+        myFieldCounts.erase(edge->getID());
+    } else {
+        const double busH = elapsed() > 0 ? value(myBuses, edge, SUMO_ATTR_ENTERED) : NO_DATA;
+        const double busD = elapsed() > 0 ? value(myBuses, edge, SUMO_ATTR_DEPARTED) : NO_DATA;
+        const double buses = has(busH) ? (busH + (has(busD) ? busD : 0)) / (elapsed() / 3600.) : 0;
+        myFieldCounts[edge->getID()] = std::make_pair(vehPerHour, buses);
+    }
+    return writeFieldCounts(error);
+}
+
+
+int
+MSProntuario::numFieldCounts() {
+    return (int)myFieldCounts.size();
+}
+
+
+std::string
+MSProntuario::fringeInfo(const MSEdge* e, double& factor) {
+    factor = -1;
+    // factor used by osmWebWizard (build.bat / build.sh of the scenario)
+    for (const std::string name : {
+                "build.bat", "build.sh"
+            }) {
+        std::ifstream in(XMLSubSys::transcodeToLocal(scenarioDir() + name).c_str());
+        std::string line;
+        while (in.good() && std::getline(in, line)) {
+            const std::string::size_type p = line.find("--fringe-factor");
+            if (p != std::string::npos && (factor < 0 || line.find("passenger") != std::string::npos)) {
+                std::istringstream is(line.substr(p + 15));
+                double f;
+                if (is >> f) {
+                    factor = f;
+                }
+            }
+        }
+        if (factor > 0) {
+            break;
+        }
+    }
+    const MSEdge* op = opposite(e);
+    bool entry = true, exit = true;
+    for (const MSEdge* x : e->getFromJunction()->getIncoming()) {
+        if (x->isNormal() && x != op) {
+            entry = false;
+        }
+    }
+    for (const MSEdge* x : e->getToJunction()->getOutgoing()) {
+        if (x->isNormal() && x != op) {
+            exit = false;
+        }
+    }
+    if (entry) {
+        return "s\303\255, entrada a la zona";
+    }
+    if (exit) {
+        return "s\303\255, salida de la zona";
+    }
+    return "no, calle interior";
 }
 
 

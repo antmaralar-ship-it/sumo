@@ -443,7 +443,7 @@ GUIPerson::getColorValue(const GUIVisualizationSettings& /* s */, int activeSche
                 case MSStageType::WAITING_FOR_DEPART:
                     return -2;
                 default:
-                    return getSpeed();
+                    return getSpeed() * 3.6; // km/h
             }
         case 5:
             if (isWaiting4Vehicle()) {

@@ -26,6 +26,7 @@
 #include <string>
 #include <algorithm>
 #include <functional>
+#include <type_traits>
 #include <utils/foxtools/fxheader.h>
 #include <utils/common/ValueSource.h>
 #include <utils/common/SUMOTime.h>
@@ -105,10 +106,47 @@ public:
      */
     template<class T>
     void mkItem(const char* name, bool dynamic, ValueSource<T>* src) {
+        std::string n(name);
+        if constexpr(std::is_same<T, double>::value) {
+            // all speeds are shown in km/h
+            if (speedNameToKmh(n)) {
+                src = new KmhValueSource(src);
+            }
+        }
         myTable->insertRows((int)myItems.size() + 1);
-        GUIParameterTableItemInterface* i = new GUIParameterTableItem<T>(myTable, myCurrentPos++, name, dynamic, src);
+        GUIParameterTableItemInterface* i = new GUIParameterTableItem<T>(myTable, myCurrentPos++, n, dynamic, src);
         myItems.push_back(i);
     }
+
+    /// @brief replaces the unit [m/s] by [km/h] in a row name, returns whether it was a speed
+    static bool speedNameToKmh(std::string& name) {
+        const std::string::size_type p = name.find("[m/s]");
+        if (p == std::string::npos) {
+            return false;
+        }
+        name.replace(p, 5, "[km/h]");
+        return true;
+    }
+
+    /// @brief value source converting m/s into km/h
+    class KmhValueSource : public ValueSource<double> {
+    public:
+        KmhValueSource(ValueSource<double>* src) : mySource(src) {}
+        ~KmhValueSource() {
+            delete mySource;
+        }
+        double getValue() const override {
+            return mySource->getValue() * 3.6;
+        }
+        ValueSource<double>* copy() const override {
+            return new KmhValueSource(mySource->copy());
+        }
+        ValueSource<double>* makedoubleReturningCopy() const override {
+            return new KmhValueSource(mySource->makedoubleReturningCopy());
+        }
+    private:
+        ValueSource<double>* mySource;
+    };
 
     /** @brief Adds a row which shows a string-value
      *

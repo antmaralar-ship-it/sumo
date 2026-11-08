@@ -563,7 +563,7 @@ GUIVehicle::getColorValue(const GUIVisualizationSettings& s, int activeScheme) c
             if (isStopped() && getNextStop().getSpeed() <= 0) {
                 return isParking() ? -2 : -1;
             }
-            return getSpeed();
+            return getSpeed() * 3.6; // km/h
         case 9:
             // color by action step
             if (isActionStep(SIMSTEP)) {
@@ -583,7 +583,7 @@ GUIVehicle::getColorValue(const GUIVisualizationSettings& s, int activeScheme) c
         case 12:
             return getLastLaneChangeOffset();
         case 13:
-            return getLane()->getVehicleMaxSpeed(this);
+            return getLane()->getVehicleMaxSpeed(this) * 3.6; // km/h
         case 14:
             return getEmissions<PollutantsInterface::CO2>();
         case 15:
@@ -623,7 +623,7 @@ GUIVehicle::getColorValue(const GUIVisualizationSettings& s, int activeScheme) c
         case 32:
             return getStopArrivalDelay();
         case 33:
-            return getLaneChangeModel().getSpeedLat();
+            return getLaneChangeModel().getSpeedLat() * 3.6; // km/h
         case 34: // by numerical param value
             std::string error;
             std::string val = getPrefixedParameter(s.vehicleParam, error);

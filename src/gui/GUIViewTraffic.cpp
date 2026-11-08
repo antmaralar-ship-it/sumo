@@ -71,6 +71,9 @@
 #include "GUISUMOViewParent.h"
 #include "GUIViewTraffic.h"
 #include "GUIProntuarioWindow.h"
+#include "GUIApplicationWindow.h"
+#include "GUIRunThread.h"
+#include <microsim/output/MSProntuario.h>
 
 // ===========================================================================
 // member method definitions
@@ -610,17 +613,71 @@ GUIViewTraffic::onCmdCloseLane(FXObject*, FXSelector, void*) {
 
 
 long
-GUIViewTraffic::onCmdProntuario(FXObject*, FXSelector, void*) {
+GUIViewTraffic::onCmdProntuario(FXObject*, FXSelector sel, void*) {
     // use the street the popup was opened for (also when chosen from the overlapped objects menu)
     const GUILane* lane = getPopup() != nullptr ? dynamic_cast<const GUILane*>(getPopup()->getGLObject()) : nullptr;
-    if (lane != nullptr) {
-        new GUIProntuarioWindow(*myApp, lane->getEdge().getID());
+    if (lane == nullptr) {
+        GUILane* cursorLane = getLaneUnderCursor();
+        if (cursorLane != nullptr) {
+            GUIGlObjectStorage::gIDStorage.unblockObject(cursorLane->getGlID());
+            lane = cursorLane;
+        }
+    }
+    if (lane == nullptr) {
         return 1;
     }
-    GUILane* cursorLane = getLaneUnderCursor();
-    if (cursorLane != nullptr) {
-        new GUIProntuarioWindow(*myApp, cursorLane->getEdge().getID());
-        GUIGlObjectStorage::gIDStorage.unblockObject(cursorLane->getGlID());
+    MSEdge& edge = lane->getEdge();
+    switch (FXSELID(sel)) {
+        case MID_PRONTUARIO:
+            new GUIProntuarioWindow(*myApp, edge.getID(), false);
+            break;
+        case MID_PRONTUARIO_VARIABLES:
+            new GUIProntuarioWindow(*myApp, edge.getID(), true);
+            break;
+        case MID_PRONTUARIO_EXCEL:
+            GUIProntuarioWindow::exportExcel(this, myApp, edge.getID(), true, true);
+            break;
+        case MID_PRONTUARIO_AFORO: {
+            const double old = MSProntuario::fieldCount(&edge);
+            FXdouble value = old >= 0 ? old : 0;
+            const std::string label = "Veh\303\255culos a motor por hora contados en la calle\n" + (edge.getStreetName().empty() ? edge.getID() : edge.getStreetName() + " (" + edge.getID() + ")")
+                                      + "\n\nPara borrar el aforo de esta calle escribe -1.";
+            if (FXInputDialog::getReal(value, this, "Aforo de campo (veh/h)", label.c_str(), nullptr, -1, 100000)) {
+                std::string error;
+                if (!MSProntuario::setFieldCount(&edge, value < 0 ? -1 : value, error)) {
+                    FXMessageBox::error(this, MBOX_OK, "Aforo de campo", "%s", error.c_str());
+                } else {
+                    myApp->setStatusBarText(value < 0 ? "Aforo de campo borrado." : "Aforo de campo guardado en " + MSProntuario::fieldCountFile());
+                }
+            }
+            break;
+        }
+        case MID_PRONTUARIO_AJUSTAR:
+            GUIProntuarioWindow::adjustDemand(this, myApp);
+            break;
+        case MID_PRONTUARIO_VMAX: {
+            FXdouble kmh = std::round(edge.getSpeedLimit() * 3.6 * 100) / 100;
+            const std::string label = "Nueva velocidad m\303\241xima en km/h para todos los carriles de\n" + (edge.getStreetName().empty() ? edge.getID() : edge.getStreetName() + " (" + edge.getID() + ")")
+                                      + "\n\nEl cambio vale para esta simulaci\303\263n; no modifica el archivo de la red.";
+            if (FXInputDialog::getReal(kmh, this, "Velocidad m\303\241xima de la calle", label.c_str(), nullptr, 1, 300)) {
+                GUIApplicationWindow* aw = dynamic_cast<GUIApplicationWindow*>(myApp);
+                GUIRunThread* runner = aw != nullptr ? aw->getRunner() : nullptr;
+                if (runner != nullptr) {
+                    runner->getSimulationLock().lock();
+                }
+                edge.setMaxSpeed(kmh / 3.6);
+                if (runner != nullptr) {
+                    runner->getSimulationLock().unlock();
+                }
+                char buf[64];
+                snprintf(buf, sizeof(buf), "%.2f", kmh);
+                myApp->setStatusBarText("Velocidad m\303\241xima de " + edge.getID() + ": " + std::string(buf) + " km/h");
+                update();
+            }
+            break;
+        }
+        default:
+            break;
     }
     return 1;
 }

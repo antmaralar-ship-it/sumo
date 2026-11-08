@@ -156,6 +156,11 @@ public:
         return myTranslatedName;
     }
 
+    /// @brief changes the displayed name (e.g. to add the unit)
+    void setTranslatedName(const std::string& name) {
+        myTranslatedName = name;
+    }
+
     const std::vector<T>& getColors() const {
         return myColors;
     }

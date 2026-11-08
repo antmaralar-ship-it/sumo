@@ -86,6 +86,15 @@ public:
         return mySchemes;
     }
 
+    /// @brief appends the unit of the values to the displayed name of each scheme (empty: no unit)
+    void setUnits(const std::vector<std::string>& units) {
+        for (int i = 0; i < (int)mySchemes.size() && i < (int)units.size(); i++) {
+            if (!units[i].empty()) {
+                mySchemes[i].setTranslatedName(mySchemes[i].getTranslatedName() + " [" + units[i] + "]");
+            }
+        }
+    }
+
     T* getSchemeByName(std::string name) {
         for (typename std::vector<T>::iterator i = mySchemes.begin(); i != mySchemes.end(); ++i) {
             if ((*i).getName() == name) {

@@ -681,6 +681,16 @@ enum {
     MID_ADD_REROUTER,
     /// @brief show the prontuario indicators of a street
     MID_PRONTUARIO,
+    /// @brief export the prontuario indicators of a street to Excel
+    MID_PRONTUARIO_EXCEL,
+    /// @brief show the edgeData variables table of a street
+    MID_PRONTUARIO_VARIABLES,
+    /// @brief enter a field count for a street
+    MID_PRONTUARIO_AFORO,
+    /// @brief adjust the demand to the field counts (routeSampler)
+    MID_PRONTUARIO_AJUSTAR,
+    /// @brief change the speed limit of a street
+    MID_PRONTUARIO_VMAX,
     /// @brief toggle detector override
     MID_VIRTUAL_DETECTOR,
 

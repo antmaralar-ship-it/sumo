@@ -8,6 +8,8 @@ set(utils_iodevices_STAT_SRCS
    OutputDevice_COUT.cpp
    OutputDevice_COUT.h
    OutputDevice_File.cpp
+   XLSXWriter.cpp
+   XLSXWriter.h
    OutputDevice_File.h
    OutputDevice_Network.cpp
    OutputDevice_Network.h
