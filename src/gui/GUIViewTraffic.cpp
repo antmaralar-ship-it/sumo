@@ -611,10 +611,16 @@ GUIViewTraffic::onCmdCloseLane(FXObject*, FXSelector, void*) {
 
 long
 GUIViewTraffic::onCmdProntuario(FXObject*, FXSelector, void*) {
-    GUILane* lane = getLaneUnderCursor();
+    // use the street the popup was opened for (also when chosen from the overlapped objects menu)
+    const GUILane* lane = getPopup() != nullptr ? dynamic_cast<const GUILane*>(getPopup()->getGLObject()) : nullptr;
     if (lane != nullptr) {
         new GUIProntuarioWindow(*myApp, lane->getEdge().getID());
-        GUIGlObjectStorage::gIDStorage.unblockObject(lane->getGlID());
+        return 1;
+    }
+    GUILane* cursorLane = getLaneUnderCursor();
+    if (cursorLane != nullptr) {
+        new GUIProntuarioWindow(*myApp, cursorLane->getEdge().getID());
+        GUIGlObjectStorage::gIDStorage.unblockObject(cursorLane->getGlID());
     }
     return 1;
 }

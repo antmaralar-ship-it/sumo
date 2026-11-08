@@ -50,7 +50,7 @@ GUIProntuarioWindow::GUIProntuarioWindow(GUIMainWindow& app, const std::string& 
     myEdgeID(edgeID) {
     FXVerticalFrame* frame = new FXVerticalFrame(this, LAYOUT_FILL_X | LAYOUT_FILL_Y);
     FXHorizontalFrame* bar = new FXHorizontalFrame(frame, LAYOUT_FILL_X);
-    new FXButton(bar, "Actualizar\tVolver a calcular con los datos de la simulación hasta ahora", nullptr, this, MID_PRONTUARIO_REFRESH, BUTTON_NORMAL);
+    new FXButton(bar, "Actualizar\tVolver a calcular con los datos de la simulaci\303\263n hasta ahora", nullptr, this, MID_PRONTUARIO_REFRESH, BUTTON_NORMAL);
     new FXButton(bar, "Copiar\tCopiar la ficha al portapapeles para pegarla en un documento", nullptr, this, MID_PRONTUARIO_COPY, BUTTON_NORMAL);
     new FXButton(bar, "Cerrar", nullptr, this, MID_PRONTUARIO_CLOSE, BUTTON_NORMAL | LAYOUT_RIGHT);
     myText = new FXText(frame, nullptr, 0, TEXT_READONLY | LAYOUT_FILL_X | LAYOUT_FILL_Y);
@@ -76,7 +76,7 @@ GUIProntuarioWindow::~GUIProntuarioWindow() {
 void
 GUIProntuarioWindow::refresh() {
     if (!MSNet::hasInstance() || !MSProntuario::active()) {
-        myReport = "No hay ninguna simulación cargada con los indicadores del prontuario.";
+        myReport = "No hay ninguna simulaci\303\263n cargada con los indicadores del prontuario.";
     } else {
         GUIApplicationWindow* aw = dynamic_cast<GUIApplicationWindow*>(myApp);
         GUIRunThread* runner = aw != nullptr ? aw->getRunner() : nullptr;
