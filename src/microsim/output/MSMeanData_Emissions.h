@@ -89,6 +89,9 @@ public:
          * @param[in] length The length of the object for which the data was collected
          * @exception IOError If an error on writing occurs (!!! not yet implemented)
          */
+        /// @brief return attribute value (absolute emissions in mg)
+        double getAttributeValue(SumoXMLAttr a, const SUMOTime period, const double numLanes, const double speedLimit) const override;
+
         void write(OutputDevice& dev, const SumoXMLAttrMask& attributeMask, const SUMOTime period,
                    const int numLanes, const double speedLimit, const double defaultTravelTime,
                    const int numVehicles = -1) const;

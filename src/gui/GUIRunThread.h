@@ -125,6 +125,11 @@ public:
         return myBreakpointLock;
     }
 
+    /// @brief lock held while a simulation step is performed
+    FXMutex& getSimulationLock() {
+        return mySimulationLock;
+    }
+
     /// @brief enable lib SUMO
     void enableLibsumo() {
         myAmLibsumo = true;

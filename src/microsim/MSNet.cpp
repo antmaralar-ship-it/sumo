@@ -70,6 +70,7 @@
 #include <mesosim/MELoop.h>
 #include <mesosim/MESegment.h>
 #include <microsim/output/MSDetectorControl.h>
+#include <microsim/output/MSProntuario.h>
 #include <microsim/MSVehicleTransfer.h>
 #include <microsim/devices/MSRoutingEngine.h>
 #include <microsim/devices/MSDevice_Vehroutes.h>
@@ -767,6 +768,7 @@ MSNet::closeSimulation(SUMOTime start, const std::string& reason) {
     if (reason != "") {
         WRITE_MESSAGE(TL("Reason: ") + reason);
     }
+    MSProntuario::writeOutput();
     myDetectorControl->close(myStep);
     if (OptionsCont::getOptions().isSet("queue-output")) {
         MSQueueExport::finish(OutputDevice::getDeviceByOption("queue-output"), myStep);

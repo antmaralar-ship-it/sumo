@@ -679,6 +679,8 @@ enum {
     MID_CLOSE_EDGE,
     /// @brief add rerouter
     MID_ADD_REROUTER,
+    /// @brief show the prontuario indicators of a street
+    MID_PRONTUARIO,
     /// @brief toggle detector override
     MID_VIRTUAL_DETECTOR,
 

@@ -183,6 +183,8 @@ public:
     virtual long onCmdCloseLane(FXObject*, FXSelector, void*);
     virtual long onCmdCloseEdge(FXObject*, FXSelector, void*);
     virtual long onCmdAddRerouter(FXObject*, FXSelector, void*);
+    /// @brief open the prontuario indicators of the street under the cursor
+    virtual long onCmdProntuario(FXObject*, FXSelector, void*);
 
     /// @brief highlight edges according to reachability
     virtual long onCmdShowReachability(FXObject*, FXSelector, void*);

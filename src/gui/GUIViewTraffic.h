@@ -110,6 +110,7 @@ public:
     long onCmdCloseLane(FXObject*, FXSelector, void*) override;
     long onCmdCloseEdge(FXObject*, FXSelector, void*) override;
     long onCmdAddRerouter(FXObject*, FXSelector, void*) override;
+    long onCmdProntuario(FXObject*, FXSelector, void*) override;
 
     /// @brief highlight edges according to reachability
     long onCmdShowReachability(FXObject*, FXSelector, void*) override;

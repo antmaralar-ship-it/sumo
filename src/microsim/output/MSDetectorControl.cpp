@@ -95,6 +95,14 @@ MSDetectorControl::add(MSMeanData* md, const std::string& device,
 }
 
 
+void
+MSDetectorControl::addInMemory(MSMeanData* md) {
+    myMeanData[md->getID()].push_back(md);
+    md->init();
+    MSGlobals::gHaveEmissions |= typeid(*md) == typeid(MSMeanData_Emissions);
+}
+
+
 const std::vector<SumoXMLTag>
 MSDetectorControl::getAvailableTypes() const {
     std::vector<SumoXMLTag> result;

@@ -56,6 +56,7 @@
 #include <microsim/MSEdgeControl.h>
 #include <microsim/MSGlobals.h>
 #include <microsim/output/MSDetectorControl.h>
+#include <microsim/output/MSProntuario.h>
 #include <microsim/MSFrame.h>
 #include <microsim/MSEdgeWeightsStorage.h>
 #include <microsim/MSStateHandler.h>
@@ -256,6 +257,8 @@ NLBuilder::build() {
     // declare meandata set by options
     buildDefaultMeanData("edgedata-output", "DEFAULT_EDGEDATA", false);
     buildDefaultMeanData("lanedata-output", "DEFAULT_LANEDATA", true);
+    // street indicators of the prontuario (in-memory, shown in sumo-gui)
+    MSProntuario::install(myOptions, myNet.isGUINet());
 
     if (stateBeginMismatch && myNet.getVehicleControl().getLoadedVehicleNo() > 0) {
         throw ProcessError(TL("Loading vehicles ahead of a state file is not supported. Correct --begin option or load vehicles with option --route-files"));

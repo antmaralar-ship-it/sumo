@@ -84,6 +84,16 @@ MSMeanData_Harmonoise::MSLaneMeanDataValues::notifyMoveInternal(const SUMOTraffi
 }
 
 
+double
+MSMeanData_Harmonoise::MSLaneMeanDataValues::getAttributeValue(SumoXMLAttr a, const SUMOTime period,
+        const double /*numLanes*/, const double /*speedLimit*/) const {
+    if (a == SUMO_ATTR_NOISE) {
+        return meanNTemp != 0 && period > 0 ? (double)(10. * log10(meanNTemp * TS / STEPS2TIME(period))) : 0.;
+    }
+    return 0;
+}
+
+
 void
 MSMeanData_Harmonoise::MSLaneMeanDataValues::write(OutputDevice& dev, const SumoXMLAttrMask& attributeMask, const SUMOTime period,
         const int /*numLanes*/, const double /*speedLimit*/, const double defaultTravelTime, const int /*numVehicles*/) const {

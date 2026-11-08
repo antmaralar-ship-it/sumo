@@ -22,6 +22,8 @@ set(microsim_output_STAT_SRCS
    MSMeanData_Net.h
    MSMeanData_Amitran.cpp
    MSMeanData_Amitran.h
+   MSProntuario.cpp
+   MSProntuario.h
    MSRouteProbe.cpp
    MSRouteProbe.h
    MSVTypeProbe.cpp

@@ -94,6 +94,32 @@ MSMeanData_Emissions::MSLaneMeanDataValues::notifyIdle(SUMOTrafficObject& veh) {
 }
 
 
+double
+MSMeanData_Emissions::MSLaneMeanDataValues::getAttributeValue(SumoXMLAttr a, const SUMOTime /*period*/,
+        const double /*numLanes*/, const double /*speedLimit*/) const {
+    switch (a) {
+        case SUMO_ATTR_CO_ABS:
+            return myEmissions.CO;
+        case SUMO_ATTR_CO2_ABS:
+            return myEmissions.CO2;
+        case SUMO_ATTR_HC_ABS:
+            return myEmissions.HC;
+        case SUMO_ATTR_PMX_ABS:
+            return myEmissions.PMx;
+        case SUMO_ATTR_NOX_ABS:
+            return myEmissions.NOx;
+        case SUMO_ATTR_FUEL_ABS:
+            return myEmissions.fuel;
+        case SUMO_ATTR_ELECTRICITY_ABS:
+            return myEmissions.electricity;
+        case SUMO_ATTR_SPEED:
+            return sampleSeconds > 0 ? travelledDistance / sampleSeconds : 0.;
+        default:
+            return 0;
+    }
+}
+
+
 void
 MSMeanData_Emissions::MSLaneMeanDataValues::write(OutputDevice& dev, const SumoXMLAttrMask& attributeMask, const SUMOTime period,
         const int /*numLanes*/, const double /*speedLimit*/, const double defaultTravelTime, const int /*numVehicles*/) const {

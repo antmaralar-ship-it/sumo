@@ -53,6 +53,7 @@
 #include <utils/common/RandHelper.h>
 #include <utils/common/SystemFrame.h>
 #include <utils/traction_wire/Circuit.h>
+#include <microsim/output/MSProntuario.h>
 #include "MSFrame.h"
 
 
@@ -328,6 +329,8 @@ MSFrame::fillOptions() {
 
     oc.doRegister("collision-output", new Option_FileName());
     oc.addDescription("collision-output", "Output", TL("Write collision information into FILE"));
+
+    MSProntuario::insertOptions(oc);
 
     oc.doRegister("edgedata-output", new Option_FileName());
     oc.addDescription("edgedata-output", "Output", TL("Write aggregated traffic statistics for all edges into FILE"));

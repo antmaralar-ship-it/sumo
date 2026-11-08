@@ -9,6 +9,8 @@ set(gui_STAT_SRCS
    GUIGlobals.h
    GUIManipulator.h
    GUIManipulator.cpp
+   GUIProntuarioWindow.cpp
+   GUIProntuarioWindow.h
    GUILoadThread.cpp
    GUILoadThread.h
    GUIRunThread.cpp

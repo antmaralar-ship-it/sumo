@@ -149,6 +149,13 @@ public:
      */
     const NamedObjectCont<MSDetectorFileOutput*>& getTypedDetectors(SumoXMLTag type) const;
 
+    /** @brief Adds a mean data collector that is updated but never written or reset
+     *
+     * Used for in-memory statistics (e.g. the prontuario street indicators in sumo-gui).
+     * The detector control takes ownership.
+     */
+    void addInMemory(MSMeanData* md);
+
     const std::map<std::string, std::vector<MSMeanData*> >& getMeanData() const {
         return myMeanData;
     }

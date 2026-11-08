@@ -120,6 +120,7 @@ FXDEFMAP(GUISUMOAbstractView) GUISUMOAbstractViewMap[] = {
     FXMAPFUNC(SEL_KEYPRESS,             0,                              GUISUMOAbstractView::onKeyPress),
     FXMAPFUNC(SEL_KEYRELEASE,           0,                              GUISUMOAbstractView::onKeyRelease),
     FXMAPFUNC(SEL_COMMAND,              MID_CLOSE_LANE,                 GUISUMOAbstractView::onCmdCloseLane),
+    FXMAPFUNC(SEL_COMMAND,              MID_PRONTUARIO,                 GUISUMOAbstractView::onCmdProntuario),
     FXMAPFUNC(SEL_COMMAND,              MID_CLOSE_EDGE,                 GUISUMOAbstractView::onCmdCloseEdge),
     FXMAPFUNC(SEL_COMMAND,              MID_ADD_REROUTER,               GUISUMOAbstractView::onCmdAddRerouter),
     FXMAPFUNC(SEL_COMMAND,              MID_REACHABILITY,               GUISUMOAbstractView::onCmdShowReachability),
@@ -393,6 +394,12 @@ GUISUMOAbstractView::onCmdCloseEdge(FXObject*, FXSelector, void*) {
 
 long
 GUISUMOAbstractView::onCmdAddRerouter(FXObject*, FXSelector, void*) {
+    return 1;
+}
+
+
+long
+GUISUMOAbstractView::onCmdProntuario(FXObject*, FXSelector, void*) {
     return 1;
 }
 

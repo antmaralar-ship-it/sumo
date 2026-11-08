@@ -70,6 +70,7 @@
 
 #include "GUISUMOViewParent.h"
 #include "GUIViewTraffic.h"
+#include "GUIProntuarioWindow.h"
 
 // ===========================================================================
 // member method definitions
@@ -603,6 +604,17 @@ GUIViewTraffic::onCmdCloseLane(FXObject*, FXSelector, void*) {
         lane->closeTraffic();
         GUIGlObjectStorage::gIDStorage.unblockObject(lane->getGlID());
         update();
+    }
+    return 1;
+}
+
+
+long
+GUIViewTraffic::onCmdProntuario(FXObject*, FXSelector, void*) {
+    GUILane* lane = getLaneUnderCursor();
+    if (lane != nullptr) {
+        new GUIProntuarioWindow(*myApp, lane->getEdge().getID());
+        GUIGlObjectStorage::gIDStorage.unblockObject(lane->getGlID());
     }
     return 1;
 }

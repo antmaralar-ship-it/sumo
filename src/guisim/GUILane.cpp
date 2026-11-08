@@ -59,6 +59,7 @@
 #include "GUIVehicle.h"
 #include "GUINet.h"
 #include <utils/gui/div/GUIDesigns.h>
+#include <microsim/output/MSProntuario.h>
 
 #include <osgview/GUIOSGHeader.h>
 
@@ -1024,6 +1025,9 @@ GUILane::getPopUpMenu(GUIMainWindow& app, GUISUMOAbstractView& parent) {
     buildSelectionPopupEntry(ret);
     //
     buildShowParamsPopupEntry(ret, false);
+    if (MSProntuario::active() && myEdge->isNormal()) {
+        GUIDesigns::buildFXMenuCommand(ret, "Indicadores del prontuario", GUIIconSubSys::getIcon(GUIIcon::APP_TABLE), &parent, MID_PRONTUARIO);
+    }
     const PositionVector& baseShape = getShape(parent.getVisualisationSettings().secondaryShape);
     const double pos = interpolateGeometryPosToLanePos(baseShape.nearest_offset_to_point25D(parent.getPositionInformation()));
     const double height = baseShape.positionAtOffset(pos).z();
