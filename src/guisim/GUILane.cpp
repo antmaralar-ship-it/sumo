@@ -1501,6 +1501,10 @@ GUILane::getColorValue(const GUIVisualizationSettings& s, int activeScheme) cons
             // by live edge data value
             return GUINet::getGUIInstance()->getMeanData(this, s.edgeDataID, s.edgeData);
         }
+        case 40: {
+            // congestion index of the street (prontuario), -1 without data
+            return isCrossing() || isWalkingArea() || !allowsVehicleClass(SVC_PASSENGER) ? -1 : MSProntuario::congestionIndex(myEdge);
+        }
     }
     return 0;
 }

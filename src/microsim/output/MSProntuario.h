@@ -81,6 +81,9 @@ public:
     /// @brief seconds of simulation covered by the collectors
     static double elapsed();
 
+    /// @brief congestion index (%) of the edge since the begin, -1 if there is no data (cached per time step)
+    static double congestionIndex(const MSEdge* edge);
+
 private:
     static void compute(const MSEdge* edge, Key& key, std::vector<std::string>* out);
     static void buildCrossingMap();
@@ -94,6 +97,9 @@ private:
     static MSMeanData* myEmissions;
     static MSMeanData* myNoise;
     static SUMOTime myBegin;
+    /// @brief congestion cache for coloring
+    static std::map<const MSEdge*, double> myCongestionCache;
+    static SUMOTime myCongestionCacheTime;
     /// @brief crossings by junction id
     static std::map<std::string, std::vector<const MSEdge*> > myCrossings;
 };

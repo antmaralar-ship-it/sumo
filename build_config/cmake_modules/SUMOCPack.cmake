@@ -124,5 +124,7 @@ set(CPACK_WIX_EXTENSIONS    "WixUtilExtension")
 set(CPACK_PACKAGE_EXECUTABLES
     "sumo-gui"  "SUMO GUI"
     "netedit"   "SUMO netedit")
+# desktop icons as well (the OSM Web Wizard one is in cpack_extras.wxs)
+set(CPACK_CREATE_DESKTOP_LINKS "sumo-gui" "netedit")
 
 include(CPack)

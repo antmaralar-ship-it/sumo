@@ -283,5 +283,14 @@
                             Name="OSMWebWizard" Value="1" Type="integer" KeyPath="yes" />
             </Component>
         </ComponentGroup>
+
+        <!-- OSM Web Wizard icon on the desktop (sumo-gui and netedit come from CPACK_CREATE_DESKTOP_LINKS) -->
+        <ComponentGroup Id="SumoDesktopShortcuts" Directory="DesktopFolder">
+            <Component Id="OSMWebWizardDesktopShortcut" Guid="45EB8216-C5AD-4859-B899-96DB451E818C">
+                <Shortcut Id="desktopWebWizPy" Name="SUMO OSM Web Wizard" Target="[INSTALL_ROOT]tools\osmWebWizard.py" />
+                <RegistryValue Root="HKCU" Key="Software\[Manufacturer]\[ProductName]\Shortcuts"
+                            Name="OSMWebWizardDesktop" Value="1" Type="integer" KeyPath="yes" />
+            </Component>
+        </ComponentGroup>
     </Fragment>
 </Wix>

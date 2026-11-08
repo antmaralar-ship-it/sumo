@@ -11,6 +11,7 @@
     <CPackWiXFragment Id="#PRODUCTFEATURE">
         <ComponentGroupRef Id="SumoExtras"/>
         <ComponentGroupRef Id="SumoShortcuts" />
+        <ComponentGroupRef Id="SumoDesktopShortcuts" />
     </CPackWiXFragment>
 
 </CPackWiXPatch>

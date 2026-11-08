@@ -59,6 +59,8 @@ MSMeanData* MSProntuario::myPeds = nullptr;
 MSMeanData* MSProntuario::myEmissions = nullptr;
 MSMeanData* MSProntuario::myNoise = nullptr;
 SUMOTime MSProntuario::myBegin = 0;
+std::map<const MSEdge*, double> MSProntuario::myCongestionCache;
+SUMOTime MSProntuario::myCongestionCacheTime = -1;
 std::map<std::string, std::vector<const MSEdge*> > MSProntuario::myCrossings;
 
 
@@ -366,6 +368,8 @@ MSProntuario::install(const OptionsCont& oc, bool gui) {
     myNet = nullptr;
     myMotor = myCars = myBikes = myBuses = myPeds = myEmissions = myNoise = nullptr;
     myCrossings.clear();
+    myCongestionCache.clear();
+    myCongestionCacheTime = -1;
     const bool wanted = (gui && oc.exists("prontuario") && oc.getBool("prontuario")) || (oc.exists("prontuario-output") && oc.isSet("prontuario-output"));
     if (!wanted) {
         return;
@@ -409,6 +413,39 @@ MSProntuario::buildCrossingMap() {
 bool
 MSProntuario::active() {
     return myNet != nullptr && MSNet::hasInstance() && MSNet::getInstance() == myNet && myMotor != nullptr;
+}
+
+
+double
+MSProntuario::congestionIndex(const MSEdge* edge) {
+    if (!active() || edge == nullptr || !edge->isNormal()) {
+        return -1;
+    }
+    const SUMOTime now = myNet->getCurrentTimeStep();
+    if (now != myCongestionCacheTime) {
+        myCongestionCache.clear();
+        myCongestionCacheTime = now;
+    }
+    auto it = myCongestionCache.find(edge);
+    if (it != myCongestionCache.end()) {
+        return it->second;
+    }
+    double result = -1;
+    double vfree = 0;
+    for (const MSLane* l : edge->getLanes()) {
+        if (isCarLane(l)) {
+            vfree = MAX2(vfree, l->getSpeedLimit());
+        }
+    }
+    double speed = value(myCars, edge, SUMO_ATTR_SPEED);
+    if (!has(speed) || speed <= 0) {
+        speed = value(myMotor, edge, SUMO_ATTR_SPEED);
+    }
+    if (vfree > 0 && has(speed) && speed > 0) {
+        result = MAX2(0., (vfree / speed - 1) * 100);
+    }
+    myCongestionCache[edge] = result;
+    return result;
 }
 
 

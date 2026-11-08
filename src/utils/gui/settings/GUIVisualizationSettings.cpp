@@ -1200,6 +1200,14 @@ GUIVisualizationSettings::initSumoGuiDefaults() {
     scheme = GUIColorScheme(SCHEME_NAME_EDGEDATA_LIVE, TL(SCHEME_NAME_EDGEDATA_LIVE.c_str()), COL_MISSING_DATA, TL("missing data"), false, MISSING_DATA, COL_SCHEME_DYNAMIC);
     scheme.setAllowsNegativeValues(true);
     laneColorer.addScheme(scheme);
+    // congestion index graded with the "Prontuario de urbanismo y movilidad" (TomTom thresholds)
+    scheme = GUIColorScheme("por congesti\303\263n de calle", "por congesti\303\263n de calle", RGBColor(204, 204, 204), "sin datos", false, -1, COL_SCHEME_DYNAMIC);
+    scheme.addColor(RGBColor(44, 155, 105), 0., "\303\223ptimo (< 15 %)");
+    scheme.addColor(RGBColor(223, 165, 38), 15., "Adecuado (15-35 %)");
+    scheme.addColor(RGBColor(216, 71, 63), 35.001, "Insuficiente (> 35 %)");
+    scheme.setInterpolated(false);
+    scheme.setAllowsNegativeValues(true);
+    laneColorer.addScheme(scheme);
 
     /// add vehicle coloring schemes
     vehicleColorer.addScheme(GUIColorScheme("given vehicle/type/route color", TL("given vehicle/type/route color"), RGBColor::YELLOW, "", true));
